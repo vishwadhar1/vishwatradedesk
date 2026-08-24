@@ -1,0 +1,13 @@
+{
+  "name": "vishwatradedesk",
+  "version": "1.0.0",
+  "description": "Vishwa Trade Desk",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "dependencies": {
+    "@vercel/analytics": "^1.4.1"
+  }
+}
