@@ -5,7 +5,7 @@ Dashboard, Journal, Trade Log.
 
 See `CLAUDE.md` for the project rules that govern how this codebase is built.
 
-## Development 
+## Development
 
 ```bash
 npm install
