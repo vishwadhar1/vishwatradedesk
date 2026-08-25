@@ -37,7 +37,7 @@ describe("formatINR", () => {
   });
 
   it("handles negative values", () => {
-    expect(formatINR(-247500)).toBe("-₹2,47,500.00");
+    expect(formatINR(-247500)).toBe("−₹2,47,500.00");
   });
 });
 
@@ -66,6 +66,32 @@ describe("formatPct", () => {
   it("takes a 0-1 fraction and renders it as a percentage", () => {
     expect(formatPct(0.5)).toBe("50.00%");
     expect(formatPct(0.735, 1)).toBe("73.5%");
+  });
+});
+
+describe("minus sign consistency", () => {
+  // U+2212 MINUS SIGN, not U+002D HYPHEN-MINUS. Different width under
+  // tabular-nums — a table mixing the two misaligns. Every formatter that
+  // can render a negative value must agree on this exact character.
+  const MINUS_SIGN = "−";
+  const HYPHEN_MINUS = "-";
+
+  it("formatINR uses the minus sign, not a hyphen", () => {
+    const rendered = formatINR(-9940);
+    expect(rendered.charAt(0)).toBe(MINUS_SIGN);
+    expect(rendered).not.toContain(HYPHEN_MINUS);
+  });
+
+  it("formatSignedINR uses the minus sign, not a hyphen", () => {
+    const rendered = formatSignedINR(-9940);
+    expect(rendered.charAt(0)).toBe(MINUS_SIGN);
+    expect(rendered).not.toContain(HYPHEN_MINUS);
+  });
+
+  it("formatQty uses the minus sign, not a hyphen", () => {
+    const rendered = formatQty(-150000);
+    expect(rendered.charAt(0)).toBe(MINUS_SIGN);
+    expect(rendered).not.toContain(HYPHEN_MINUS);
   });
 });
 

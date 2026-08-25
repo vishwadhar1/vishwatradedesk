@@ -3,6 +3,12 @@ import Decimal from "decimal.js";
 const LAKH = 1_00_000;
 const CRORE = 1_00_00_000;
 
+// U+2212 MINUS SIGN, not U+002D HYPHEN-MINUS — every negative-number
+// formatter in this file must use this exact constant. A stray "-" here
+// renders at a different width than "−" and quietly breaks tabular-nums
+// column alignment wherever a P&L and a charges column sit side by side.
+const MINUS_SIGN = "−";
+
 /** "247500" -> "2,47,500" (last 3 digits, then groups of 2 — the Indian numbering system). */
 function groupIndian(digits: string): string {
   if (digits.length <= 3) return digits;
@@ -18,7 +24,7 @@ export function formatINR(
 ): string {
   const decimal = new Decimal(value);
   const negative = decimal.isNegative();
-  const sign = negative ? "-" : "";
+  const sign = negative ? MINUS_SIGN : "";
   const abs = decimal.abs();
 
   if (options?.compact) {
@@ -40,7 +46,7 @@ export function formatSignedINR(
   options?: { compact?: boolean },
 ): string {
   const decimal = new Decimal(value);
-  const prefix = decimal.isNegative() ? "−" : "+";
+  const prefix = decimal.isNegative() ? MINUS_SIGN : "+";
   return `${prefix}${formatINR(decimal.abs().toString(), options)}`;
 }
 
@@ -48,7 +54,7 @@ export function formatSignedINR(
 export function formatQty(qty: number | string): string {
   const decimal = new Decimal(qty);
   const negative = decimal.isNegative();
-  return `${negative ? "-" : ""}${groupIndian(decimal.abs().toFixed(0))}`;
+  return `${negative ? MINUS_SIGN : ""}${groupIndian(decimal.abs().toFixed(0))}`;
 }
 
 /** value is a 0-1 fraction (0.0735, not 7.35) — matches netPnlPct / winRate / adherence's own convention. */
