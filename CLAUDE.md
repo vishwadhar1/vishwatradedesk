@@ -8,12 +8,21 @@
   Never store a derived value.
 - All money maths goes through /lib/calc. It is pure, has no I/O, and is unit-tested.
   UI never does arithmetic.
+- All number and currency rendering goes through /lib/calc/format.ts. Components never format
+  money, percentages, or quantities themselves — that's how the minus-sign-character bug
+  (U+2212 vs U+002D) gets reintroduced somewhere the tests don't reach.
 - Charges are a single `total_charges` number per transaction. Never break them into
   brokerage/STT/GST. No tax engine, no corporate actions, no broker integration.
 - Cost basis is FIFO. Buy charges are capitalised into cost basis and released pro-rata as
   shares are sold — never expensed on entry.
 - Currency is INR with Indian digit grouping (₹2,47,500.00 — never ₹247,500.00).
+- There is no middleware in this project. Route protection lives in app/(app)/layout.tsx via
+  `await auth()`. Every new protected route goes inside that route group.
+- Never add an auth bypass, test flag, or skip-gate of any kind. Route protection has exactly
+  one implementation: `await auth()` in app/(app)/layout.tsx.
 - Dark-first UI. Information-dense, compact, no animations beyond 120ms colour/opacity.
   No card shadows, no gradients, no charts beyond the two specified.
+- The DataTable primitive applies `font-variant-numeric: tabular-nums` to every numeric cell;
+  numeric columns are right-aligned.
 - Do not build features "for later". If it isn't needed by Dashboard, Journal or Trade Log,
   it doesn't get built.

@@ -2,9 +2,9 @@ import { signIn } from "@/auth";
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-950 text-neutral-100">
+    <main className="flex min-h-screen items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <h1 className="text-lg font-medium">TradeDesk</h1>
+        <h1 className="text-text text-lg font-medium">TradeDesk</h1>
         <form
           action={async () => {
             "use server";
@@ -13,7 +13,7 @@ export default function LoginPage() {
         >
           <button
             type="submit"
-            className="rounded border border-neutral-700 px-4 py-2 text-sm text-neutral-100 transition-colors duration-[120ms] hover:bg-neutral-900"
+            className="border-border text-text hover:bg-surface rounded-sm border px-4 py-2 text-sm transition-colors duration-[120ms]"
           >
             Sign in with Google
           </button>
