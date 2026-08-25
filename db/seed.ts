@@ -3,16 +3,19 @@ import "./env";
 import { db } from "./index";
 import { playbooks, positions, settings, transactions } from "./schema";
 
-const STRATEGIES = [
+const asManagedList = (names: string[]) =>
+  names.map((name) => ({ name, archived: false }));
+
+const STRATEGIES = asManagedList([
   "Breakout",
   "Pullback",
   "Reversal",
   "VCP",
   "Momentum",
   "Positional Investment",
-];
+]);
 
-const SETUPS = [
+const SETUPS = asManagedList([
   "Cup & Handle",
   "Flag / Pennant",
   "52-Week High",
@@ -21,7 +24,7 @@ const SETUPS = [
   "Range Breakout",
   "Rounding Bottom",
   "Earnings Gap",
-];
+]);
 
 async function seedSettings() {
   await db
@@ -67,12 +70,17 @@ async function seedPlaybook() {
     .returning();
 
   console.log("seeded playbook: VCP Breakout");
-  return { playbookId: playbook.id, ruleIds: rules.map((r) => r.id) };
+  return { playbookId: playbook.id, rules };
 }
 
-async function seedPositions(playbookId: string, ruleIds: string[]) {
+async function seedPositions(
+  playbookId: string,
+  rules: { id: string; text: string }[],
+) {
+  // Snapshot ids AND text at scoring time — never re-derived from the live
+  // playbook, so a later edit to playbook.rules can't alter these.
   const rulesFollowed = (indices: number[]) =>
-    Object.fromEntries(ruleIds.map((id, i) => [id, indices.includes(i)]));
+    rules.map((rule, i) => ({ ...rule, followed: indices.includes(i) }));
 
   const [reliance] = await db
     .insert(positions)
@@ -422,8 +430,8 @@ async function seedTransactions(positionIds: {
 
 async function main() {
   await seedSettings();
-  const { playbookId, ruleIds } = await seedPlaybook();
-  const seededPositions = await seedPositions(playbookId, ruleIds);
+  const { playbookId, rules } = await seedPlaybook();
+  const seededPositions = await seedPositions(playbookId, rules);
 
   const positionIds = {
     reliance: seededPositions.reliance.id,

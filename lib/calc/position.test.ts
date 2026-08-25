@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computePosition,
   openR,
+  readRuleSnapshot,
   realizedR,
   type PositionInput,
   type TransactionInput,
@@ -270,6 +271,61 @@ describe("computePosition — status transitions", () => {
     const withPlaybook: PositionInput = {
       ...base,
       playbookId: "pb-1",
+      rulesFollowed: [
+        { id: "r1", text: "Base of at least 7 weeks", followed: true },
+        { id: "r2", text: "Two or more contractions", followed: true },
+        { id: "r3", text: "Volume dries up", followed: false },
+        { id: "r4", text: "Entry above the pivot on volume", followed: true },
+        { id: "r5", text: "Stop below the last contraction", followed: true },
+        { id: "r6", text: "Risk <= 1% of account capital", followed: true },
+      ],
+    };
+    expect(computePosition(base, []).adherence).toBeNull();
+    expect(computePosition(withPlaybook, [])?.adherence).toBeCloseTo(5 / 6, 9);
+  });
+
+  it("adherence is computed from the followed flags only — snapshotted rule text never affects it", () => {
+    // Simulates a playbook rule being edited after this position was
+    // scored: only `text` differs, `id` and `followed` are identical.
+    // The adherence figure must be byte-for-byte the same either way.
+    const scoredAt: PositionInput = {
+      ...base,
+      playbookId: "pb-1",
+      rulesFollowed: [
+        { id: "r1", text: "Base of at least 7 weeks", followed: true },
+        { id: "r2", text: "Volume dries up", followed: false },
+      ],
+    };
+    const afterPlaybookEdited: PositionInput = {
+      ...base,
+      playbookId: "pb-1",
+      rulesFollowed: [
+        { id: "r1", text: "Base of at least 8 weeks (edited)", followed: true },
+        {
+          id: "r2",
+          text: "Volume dries up through the pivot (edited)",
+          followed: false,
+        },
+      ],
+    };
+    expect(computePosition(scoredAt, []).adherence).toBe(
+      computePosition(afterPlaybookEdited, []).adherence,
+    );
+  });
+});
+
+describe("legacy rules_followed shape (rows written before migration 0002)", () => {
+  const base: PositionInput = {
+    direction: "LONG",
+    plannedEntry: "2500",
+    initialStopLoss: "2400",
+    plannedQty: 150,
+    playbookId: "pb-1",
+  };
+
+  it("does not throw on the object shape — it used to die on rules.filter", () => {
+    const legacy: PositionInput = {
+      ...base,
       rulesFollowed: {
         r1: true,
         r2: true,
@@ -279,7 +335,53 @@ describe("computePosition — status transitions", () => {
         r6: true,
       },
     };
-    expect(computePosition(base, []).adherence).toBeNull();
-    expect(computePosition(withPlaybook, [])?.adherence).toBeCloseTo(5 / 6, 9);
+    expect(() => computePosition(legacy, [])).not.toThrow();
+    expect(computePosition(legacy, []).adherence).toBeCloseTo(5 / 6, 9);
+  });
+
+  it("scores the object and array shapes identically", () => {
+    const legacy: PositionInput = {
+      ...base,
+      rulesFollowed: { r1: true, r2: false, r3: true, r4: false },
+    };
+    const migrated: PositionInput = {
+      ...base,
+      rulesFollowed: [
+        { id: "r1", text: "Base of at least 7 weeks", followed: true },
+        { id: "r2", text: "Two or more contractions", followed: false },
+        { id: "r3", text: "Volume dries up", followed: true },
+        { id: "r4", text: "Entry above the pivot", followed: false },
+      ],
+    };
+    expect(computePosition(legacy, []).adherence).toBe(
+      computePosition(migrated, []).adherence,
+    );
+  });
+
+  it("treats a non-boolean legacy answer as not-followed rather than truthy", () => {
+    // Guards against `Boolean("false")` — a stray string must never score.
+    const raw = { r1: "false", r2: 1, r3: true } as unknown as Record<
+      string,
+      boolean
+    >;
+    expect(readRuleSnapshot(raw)?.map((r) => r.followed)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  it("returns null for an empty object and for null, never NaN", () => {
+    expect(
+      computePosition({ ...base, rulesFollowed: {} }, []).adherence,
+    ).toBeNull();
+    expect(
+      computePosition({ ...base, rulesFollowed: null }, []).adherence,
+    ).toBeNull();
+  });
+
+  it("passes an array straight through without rebuilding it", () => {
+    const rules = [{ id: "r1", text: "Base", followed: true }];
+    expect(readRuleSnapshot(rules)).toBe(rules);
   });
 });

@@ -78,13 +78,25 @@ describe("closedTradeMetrics", () => {
   it("splits adherenceSplit by whether all playbook rules were followed", () => {
     const trades: PositionWithTransactions[] = [
       closedTrade(
-        { playbookId: "pb-1", rulesFollowed: { r1: true, r2: true } },
+        {
+          playbookId: "pb-1",
+          rulesFollowed: [
+            { id: "r1", text: "Rule one", followed: true },
+            { id: "r2", text: "Rule two", followed: true },
+          ],
+        },
         1000,
         1100,
         "2026-01-05",
       ),
       closedTrade(
-        { playbookId: "pb-1", rulesFollowed: { r1: true, r2: false } },
+        {
+          playbookId: "pb-1",
+          rulesFollowed: [
+            { id: "r1", text: "Rule one", followed: true },
+            { id: "r2", text: "Rule two", followed: false },
+          ],
+        },
         1000,
         900,
         "2026-01-10",

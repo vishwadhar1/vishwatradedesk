@@ -5,6 +5,12 @@ export type { TransactionInput };
 
 export type PositionStatus = "PLANNED" | "OPEN" | "PARTIALLY_CLOSED" | "CLOSED";
 
+/** One playbook rule as it read at the moment the position was scored. */
+export type RuleSnapshot = { id: string; text: string; followed: boolean };
+
+/** Pre-0002 shape: answers keyed by rule id, with no snapshotted rule text. */
+export type LegacyRulesFollowed = Record<string, boolean>;
+
 export type PositionInput = {
   direction: "LONG" | "SHORT";
   positionType?: "SWING" | "INVESTMENT" | "POSITIONAL";
@@ -15,7 +21,15 @@ export type PositionInput = {
   currentPrice?: number | string | null;
   previousClose?: number | string | null;
   playbookId?: string | null;
-  rulesFollowed?: Record<string, boolean> | null;
+  /**
+   * The scoring snapshot. New code must only ever write `RuleSnapshot[]`; the
+   * legacy arm exists because this value arrives from a `jsonb` column, where
+   * `$type<>()` is erased at compile time — a row written before migration
+   * 0002 still holds `Record<ruleId, boolean>` and TypeScript cannot see the
+   * difference. Spelling the union out keeps writers type-checked (unlike
+   * `unknown`) while forcing every reader through `readRuleSnapshot`.
+   */
+  rulesFollowed?: RuleSnapshot[] | LegacyRulesFollowed | null;
 };
 
 export type ComputedPosition = {
@@ -68,11 +82,42 @@ function riskPerShare(position: PositionInput): Decimal {
   return new Decimal(position.plannedEntry).minus(position.initialStopLoss);
 }
 
+/**
+ * Normalises whatever the `rules_followed` column holds into the current
+ * shape. Returns null when there is nothing scorable.
+ *
+ * Two shapes exist in the wild:
+ *   current — [{ id, text, followed }]  (rule text snapshotted at scoring time)
+ *   legacy  — { [ruleId]: boolean }     (answers only, no text)
+ *
+ * The legacy shape predates migration 0002 and should not survive it. This
+ * still handles it, because the alternative is `rules.filter is not a
+ * function` thrown out of the engine every screen reads from — a crash, not a
+ * wrong number. Adherence is recoverable from the legacy shape (it only needs
+ * the flags); the rule text is not, which is exactly why 0002 backfills it
+ * from the playbook rather than leaving this function to cope forever.
+ */
+export function readRuleSnapshot(
+  raw: RuleSnapshot[] | LegacyRulesFollowed | null | undefined,
+): RuleSnapshot[] | null {
+  if (Array.isArray(raw)) return raw as RuleSnapshot[];
+  if (raw !== null && typeof raw === "object") {
+    return Object.entries(raw as Record<string, unknown>).map(
+      ([id, followed]) => ({
+        id,
+        text: "",
+        followed: followed === true,
+      }),
+    );
+  }
+  return null;
+}
+
 function computeAdherence(position: PositionInput): number | null {
-  if (!position.playbookId || !position.rulesFollowed) return null;
-  const values = Object.values(position.rulesFollowed);
-  if (values.length === 0) return null;
-  return safeDivide(values.filter(Boolean).length, values.length);
+  if (!position.playbookId) return null;
+  const rules = readRuleSnapshot(position.rulesFollowed);
+  if (!rules || rules.length === 0) return null;
+  return safeDivide(rules.filter((r) => r.followed).length, rules.length);
 }
 
 export function computePosition(

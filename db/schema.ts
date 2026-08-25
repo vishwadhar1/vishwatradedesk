@@ -33,6 +33,8 @@ export const managementNoteTypeEnum = pgEnum("management_note_type", [
   "OTHER",
 ]);
 
+export type ManagedListItem = { name: string; archived: boolean };
+
 // rules: [{ id: string, text: string }]
 export const playbooks = pgTable("playbooks", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -61,7 +63,14 @@ export const positions = pgTable(
     setup: text("setup").notNull(),
 
     playbookId: uuid("playbook_id").references(() => playbooks.id),
-    rulesFollowed: jsonb("rules_followed").$type<Record<string, boolean>>(),
+    // Snapshot of the playbook's rules (id + text) as they read at scoring
+    // time, plus the answer — never re-derived from the live playbook, so
+    // editing playbook.rules later can't alter a position's adherence or
+    // the checklist text it was actually scored against.
+    rulesFollowed:
+      jsonb("rules_followed").$type<
+        { id: string; text: string; followed: boolean }[]
+      >(),
     tags: text("tags")
       .array()
       .notNull()
@@ -194,14 +203,14 @@ export const settings = pgTable(
   {
     id: smallint("id").primaryKey().default(1),
     accountCapital: numeric("account_capital").notNull(),
-    strategies: text("strategies")
-      .array()
+    // Archiving hides a value from new-position dropdowns without deleting
+    // it — positions already holding it (a plain text column, not an FK)
+    // keep displaying it, and it stays available to Trade Log filters.
+    strategies: jsonb("strategies")
+      .$type<ManagedListItem[]>()
       .notNull()
-      .default(sql`'{}'::text[]`),
-    setups: text("setups")
-      .array()
-      .notNull()
-      .default(sql`'{}'::text[]`),
+      .default([]),
+    setups: jsonb("setups").$type<ManagedListItem[]>().notNull().default([]),
     defaultExchange: text("default_exchange").notNull().default("NSE"),
     breakevenHandling: text("breakeven_handling").notNull().default("EXCLUDE"),
   },
