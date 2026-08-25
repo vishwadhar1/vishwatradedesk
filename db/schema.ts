@@ -23,10 +23,7 @@ export const positionTypeEnum = pgEnum("position_type", [
   "INVESTMENT",
   "POSITIONAL",
 ]);
-export const transactionSideEnum = pgEnum("transaction_side", [
-  "BUY",
-  "SELL",
-]);
+export const transactionSideEnum = pgEnum("transaction_side", ["BUY", "SELL"]);
 export const managementNoteTypeEnum = pgEnum("management_note_type", [
   "ADD",
   "REDUCE",
@@ -206,9 +203,7 @@ export const settings = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     defaultExchange: text("default_exchange").notNull().default("NSE"),
-    breakevenHandling: text("breakeven_handling")
-      .notNull()
-      .default("EXCLUDE"),
+    breakevenHandling: text("breakeven_handling").notNull().default("EXCLUDE"),
   },
   (table) => [check("settings_singleton_check", sql`${table.id} = 1`)],
 );
