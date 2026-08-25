@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computePosition,
   openR,
+  plannedRiskPct,
   readRuleSnapshot,
   realizedR,
   type PositionInput,
@@ -161,6 +162,81 @@ describe("computePosition — PLANNED position", () => {
     expect(result.openR).toBeNull();
     expect(Number.isNaN(result.realizedNet)).toBe(false);
     expect(Number.isNaN(result.netPnl)).toBe(false);
+  });
+});
+
+describe("computePosition — bare position, no plan set yet", () => {
+  it("returns null risk/plannedRisk/plannedRR/R instead of throwing on a null plan", () => {
+    const bare: PositionInput = {
+      direction: "LONG",
+      plannedEntry: null,
+      initialStopLoss: null,
+      plannedQty: null,
+    };
+    const result = computePosition(bare, []);
+    expect(result.status).toBe("PLANNED");
+    expect(result.riskPerShare).toBeNull();
+    expect(result.plannedRisk).toBeNull();
+    expect(result.plannedRR).toBeNull();
+    expect(result.realizedR).toBeNull();
+    expect(result.openR).toBeNull();
+  });
+
+  it("plannedRisk is null when only plannedQty is missing, even with a real plan", () => {
+    const partial: PositionInput = {
+      direction: "LONG",
+      plannedEntry: "2500",
+      initialStopLoss: "2400",
+      plannedQty: null,
+    };
+    const result = computePosition(partial, []);
+    expect(result.riskPerShare).toBeCloseTo(100, 9);
+    expect(result.plannedRisk).toBeNull();
+  });
+
+  it("a sale still computes realizedR once the plan is filled in, even though it started null", () => {
+    const filledInLater: PositionInput = {
+      direction: "LONG",
+      plannedEntry: "2500",
+      initialStopLoss: "2400",
+      plannedQty: 100,
+    };
+    const transactions: TransactionInput[] = [
+      {
+        side: "BUY",
+        quantity: 100,
+        price: "2500",
+        totalCharges: "0",
+        date: "2026-07-06",
+        seq: 1,
+      },
+      {
+        side: "SELL",
+        quantity: 100,
+        price: "2600",
+        totalCharges: "0",
+        date: "2026-07-20",
+        seq: 2,
+      },
+    ];
+    const result = computePosition(filledInLater, transactions);
+    expect(result.realizedR).toBeCloseTo(1, 9);
+  });
+});
+
+describe("plannedRiskPct", () => {
+  it("returns a fraction, not a percentage", () => {
+    expect(plannedRiskPct(10000, 1000000)).toBeCloseTo(0.01, 9);
+  });
+
+  it("is null when either input is null, not NaN or Infinity", () => {
+    expect(plannedRiskPct(null, 1000000)).toBeNull();
+    expect(plannedRiskPct(10000, null)).toBeNull();
+    expect(plannedRiskPct(null, null)).toBeNull();
+  });
+
+  it("is null, not Infinity, when account capital is zero", () => {
+    expect(plannedRiskPct(10000, 0)).toBeNull();
   });
 });
 

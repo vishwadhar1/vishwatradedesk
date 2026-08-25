@@ -76,11 +76,15 @@ export const positions = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
 
-    plannedEntry: numeric("planned_entry").notNull(),
-    initialStopLoss: numeric("initial_stop_loss").notNull(),
+    // Nullable — a position can be created with only symbol + direction and
+    // the plan filled in later on the detail page. initial_stop_loss is
+    // write-once once set (enforced in app/(app)/journal/actions.ts, not
+    // here — Postgres has no clean "immutable after first write" primitive).
+    plannedEntry: numeric("planned_entry"),
+    initialStopLoss: numeric("initial_stop_loss"),
     currentStopLoss: numeric("current_stop_loss"),
     targetPrice: numeric("target_price"),
-    plannedQty: integer("planned_qty").notNull(),
+    plannedQty: integer("planned_qty"),
 
     thesisWhy: text("thesis_why").notNull().default(""),
     marketContext: text("market_context").notNull().default(""),

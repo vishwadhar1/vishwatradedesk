@@ -59,7 +59,20 @@ export function formatQty(qty: number | string): string {
 
 /** value is a 0-1 fraction (0.0735, not 7.35) — matches netPnlPct / winRate / adherence's own convention. */
 export function formatPct(value: number, decimals = 2): string {
-  return `${(value * 100).toFixed(decimals)}%`;
+  const sign = value < 0 ? MINUS_SIGN : "";
+  return `${sign}${Math.abs(value * 100).toFixed(decimals)}%`;
+}
+
+/** Same as formatPct, but always carries an explicit +/− sign — including zero. */
+export function formatSignedPct(value: number, decimals = 2): string {
+  const sign = value < 0 ? MINUS_SIGN : "+";
+  return `${sign}${Math.abs(value * 100).toFixed(decimals)}%`;
+}
+
+/** "1.99R", "−0.50R" — an R multiple, not currency, so no ₹ and no Indian grouping. */
+export function formatR(value: number, decimals = 2): string {
+  const sign = value < 0 ? MINUS_SIGN : "";
+  return `${sign}${Math.abs(value).toFixed(decimals)}R`;
 }
 
 const DAYS_PER_MONTH = 30;

@@ -4,7 +4,9 @@ import {
   formatINR,
   formatPct,
   formatQty,
+  formatR,
   formatSignedINR,
+  formatSignedPct,
 } from "./format";
 
 describe("formatINR", () => {
@@ -67,6 +69,31 @@ describe("formatPct", () => {
     expect(formatPct(0.5)).toBe("50.00%");
     expect(formatPct(0.735, 1)).toBe("73.5%");
   });
+
+  it("uses the minus sign − for a negative fraction, not a hyphen", () => {
+    // Native toFixed() on a negative number produces a hyphen — this is
+    // exactly the class of bug the rest of this file guards against, just
+    // never previously exercised with a negative formatPct input.
+    const rendered = formatPct(-0.0537);
+    expect(rendered).toBe("−5.37%");
+    expect(rendered).not.toContain("-");
+  });
+});
+
+describe("formatSignedPct", () => {
+  it("always carries a sign, even for a positive value", () => {
+    expect(formatSignedPct(0.045)).toBe("+4.50%");
+  });
+
+  it("uses the minus sign − for negatives, not a hyphen", () => {
+    const rendered = formatSignedPct(-0.045);
+    expect(rendered).toBe("−4.50%");
+    expect(rendered).not.toContain("-");
+  });
+
+  it("defaults zero to +", () => {
+    expect(formatSignedPct(0)).toBe("+0.00%");
+  });
 });
 
 describe("minus sign consistency", () => {
@@ -92,6 +119,22 @@ describe("minus sign consistency", () => {
     const rendered = formatQty(-150000);
     expect(rendered.charAt(0)).toBe(MINUS_SIGN);
     expect(rendered).not.toContain(HYPHEN_MINUS);
+  });
+});
+
+describe("formatR", () => {
+  it("formats a positive R multiple with no sign", () => {
+    expect(formatR(1.988)).toBe("1.99R");
+  });
+
+  it("uses the minus sign − for a negative R multiple, not a hyphen", () => {
+    const rendered = formatR(-0.5);
+    expect(rendered).toBe("−0.50R");
+    expect(rendered).not.toContain("-");
+  });
+
+  it("never carries a ₹ symbol or Indian digit grouping — it isn't currency", () => {
+    expect(formatR(12345.6)).toBe("12345.60R");
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Field } from "@/components/Field";
 import { Section } from "@/components/Section";
@@ -71,6 +71,10 @@ export function PlaybookEditor({ playbook }: { playbook: Playbook | null }) {
           await createPlaybook(name, description, rules);
         }
       } catch (e) {
+        // createPlaybook ends in redirect() on success, which throws a
+        // framework signal, not a real error — let it through uncaught or
+        // the navigation never happens and this shows a false error instead.
+        unstable_rethrow(e);
         setError(e instanceof Error ? e.message : "Could not save.");
       }
     });

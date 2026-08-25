@@ -14,10 +14,11 @@ export type LegacyRulesFollowed = Record<string, boolean>;
 export type PositionInput = {
   direction: "LONG" | "SHORT";
   positionType?: "SWING" | "INVESTMENT" | "POSITIONAL";
-  plannedEntry: number | string;
-  initialStopLoss: number | string;
+  /** Null when the plan hasn't been filled in yet — a bare symbol+direction position. */
+  plannedEntry: number | string | null;
+  initialStopLoss: number | string | null;
   targetPrice?: number | string | null;
-  plannedQty: number;
+  plannedQty: number | null;
   currentPrice?: number | string | null;
   previousClose?: number | string | null;
   playbookId?: string | null;
@@ -53,8 +54,9 @@ export type ComputedPosition = {
   entryDate: string | null;
   exitDate: string | null;
   holdingDays: number | null;
-  riskPerShare: number;
-  plannedRisk: number;
+  /** Null when there's no plan yet (planned_entry or initial_stop_loss unset). */
+  riskPerShare: number | null;
+  plannedRisk: number | null;
   plannedRR: number | null;
   realizedR: number | null;
   openR: number | null;
@@ -72,12 +74,20 @@ function daysBetween(from: string, to: string): number {
   return Math.round((b - a) / 86_400_000);
 }
 
-/** V1 is long-only — every position-level calculation funnels through here so a SHORT position always fails loudly instead of silently computing the wrong sign. */
-function riskPerShare(position: PositionInput): Decimal {
+/**
+ * V1 is long-only — every position-level calculation funnels through here so
+ * a SHORT position always fails loudly instead of silently computing the
+ * wrong sign. Null, not a throw, when the plan simply hasn't been set yet —
+ * that's a normal state (a bare symbol+direction position), not an error.
+ */
+function riskPerShare(position: PositionInput): Decimal | null {
   if (position.direction === "SHORT") {
     throw new Error(
       "computePosition does not support SHORT positions — V1 is long-only, and silently wrong P&L is worse than a loud failure.",
     );
+  }
+  if (position.plannedEntry == null || position.initialStopLoss == null) {
+    return null;
   }
   return new Decimal(position.plannedEntry).minus(position.initialStopLoss);
 }
@@ -178,21 +188,24 @@ export function computePosition(
       ? null
       : daysBetween(fifo.entryDate, exitDate ?? todayIso());
 
-  const plannedRisk = risk.times(position.plannedQty).toNumber();
+  const plannedRisk =
+    risk === null || position.plannedQty == null
+      ? null
+      : risk.times(position.plannedQty).toNumber();
   const plannedRR =
-    position.targetPrice == null
+    risk === null || position.targetPrice == null
       ? null
       : safeDivide(
-          new Decimal(position.targetPrice).minus(position.plannedEntry),
+          new Decimal(position.targetPrice).minus(position.plannedEntry!),
           risk,
         );
 
   const realizedR =
-    fifo.totalQtySold === 0
+    risk === null || fifo.totalQtySold === 0
       ? null
       : safeDivide(realizedNet, risk.times(fifo.totalQtySold));
   const openR =
-    openQty === 0 || unrealizedNet === null
+    risk === null || openQty === 0 || unrealizedNet === null
       ? null
       : safeDivide(unrealizedNet, risk.times(openQty));
 
@@ -216,13 +229,27 @@ export function computePosition(
     entryDate: fifo.entryDate,
     exitDate,
     holdingDays,
-    riskPerShare: risk.toNumber(),
+    riskPerShare: risk === null ? null : risk.toNumber(),
     plannedRisk,
     plannedRR,
     realizedR,
     openR,
     adherence: computeAdherence(position),
   };
+}
+
+/**
+ * Planned risk as a fraction of account capital (0.02, not 2) — pair with
+ * formatPct. Account capital lives on settings, not the position, so it
+ * can't be folded into computePosition itself; this keeps the division out
+ * of the UI layer, which is the point.
+ */
+export function plannedRiskPct(
+  plannedRisk: number | null,
+  accountCapital: number | null,
+): number | null {
+  if (plannedRisk === null || accountCapital === null) return null;
+  return safeDivide(plannedRisk, accountCapital);
 }
 
 /** Thin convenience wrapper — same value as computePosition(...).realizedR. */
